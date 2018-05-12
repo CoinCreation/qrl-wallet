@@ -11,7 +11,6 @@ let countRecipientsForValidation = 1
 function createTokenTxn() {
   // Get to/amount details
   const sendFrom = addressForAPI(LocalStore.get('transferFromAddress'))
-
   const owner = addressForAPI(document.getElementById('owner').value)
   const symbol = document.getElementById('symbol').value
   const name = document.getElementById('name').value
@@ -22,7 +21,7 @@ function createTokenTxn() {
   let tokenHolders = []
 
   // Convert strings to bytes
-  const pubKey = binaryToBytes(XMSS_OBJECT.getPK())
+  const pubKey = hexToBytes(XMSS_OBJECT.getPK())
   const symbolBytes = stringToBytes(symbol)
   const nameBytes = stringToBytes(name)
 
@@ -209,7 +208,13 @@ Template.appTokenCreate.onRendered(() => {
   initialiseFormValidation()
 
   // Get wallet balance
-  getBalance(getXMSSDetails().address, function() {})
+  getBalance(getXMSSDetails().address, function() {
+    // Show warning is otsKeysRemaining is low
+    if(LocalStore.get('otsKeysRemaining') < 50) {
+      // Shown low OTS Key warning modal
+      $('#lowOtsKeyWarning').modal('transition', 'disable').modal('show')
+    }
+  })
 })
 
 Template.appTokenCreate.events({
@@ -291,6 +296,10 @@ Template.appTokenCreate.helpers({
   otsKeyEstimate() {
     const otsKeyEstimate = LocalStore.get('otsKeyEstimate')
     return otsKeyEstimate
+  },
+  otsKeysRemaining() {
+    const otsKeysRemaining = LocalStore.get('otsKeysRemaining')
+    return otsKeysRemaining
   },
   nodeExplorerUrl() {
     if ((LocalStore.get('nodeExplorerUrl') === '') || (LocalStore.get('nodeExplorerUrl') === null)) {

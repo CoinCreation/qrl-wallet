@@ -11,7 +11,7 @@ DEFAULT_NODES = [
     name: 'Testnet (Official QRL Node 1)',
     disabled: '',
     explorerUrl: 'https://explorer.theqrl.org',
-    grpc: '104.237.3.185:9009',
+    grpc: '35.177.60.137:9009',
     type: 'both',
   },
   {
@@ -39,22 +39,6 @@ DEFAULT_NODES = [
     type: 'both',
   },
   {
-    id: 'testnet-5',
-    name: 'Testnet (Official QRL Node 5)',
-    disabled: '',
-    explorerUrl: 'https://explorer.theqrl.org',
-    grpc: '104.237.3.184:9009',
-    type: 'both',
-  },
-  {
-    id: 'testnet-6',
-    name: 'Testnet (Official QRL Node 6)',
-    disabled: '',
-    explorerUrl: 'https://explorer.theqrl.org',
-    grpc: '52.220.119.253:9009',
-    type: 'both',
-  },
-  {
     id: 'mainnet',
     name: 'Mainnet (Official QRL Node)',
     disabled: 'disabled',
@@ -69,8 +53,20 @@ DEFAULT_NODES = [
     explorerUrl: 'http://explorer.theqrl.org',
     grpc: 'localhost:9009',
     type: 'desktop',
-  },
+  }
 ]
+
+// Override DEFAULT_NODES if provided in settings file
+try {
+  if (Meteor.settings.public.defaultNodes.length > 0) {
+    // Reset DEFAULT_NODES
+    DEFAULT_NODES = []
+    // Set DEFAULT_NODES from Meteor settings
+    DEFAULT_NODES=Meteor.settings.public.defaultNodes
+  }
+} catch (e) {
+  // no configuration file used
+}
 
 // Function to search through the DEFAULT_NODES array and identify and return an
 // object based on its 'id' value.

@@ -1,3 +1,4 @@
+import qrlAddressValdidator from '@theqrl/validate-qrl-address'
 /* global QRLLIB */
 /* global XMSS_OBJECT */
 
@@ -18,21 +19,16 @@ selectedNode = () => {
 
 // Fetchs XMSS details from the global XMSS_OBJECT variable
 getXMSSDetails = () => {
-  const thisAddressBytes = XMSS_OBJECT.getAddress()
-  const thisAddress = QRLLIB.bin2hstr(thisAddressBytes)
+  const thisAddress = XMSS_OBJECT.getAddress()
   const thisPk = XMSS_OBJECT.getPK()
-  
-  const thisHashFunction = QRLLIB.getHashFunction(thisAddressBytes)
-  const thisSignatureType = QRLLIB.getSignatureType(thisAddressBytes)
-  const thisHeight = QRLLIB.getHeight(thisAddressBytes)
-
-  const thisRandomSeed = XMSS_OBJECT.getExtendedSeed()
-
-  const thisHexSeed = QRLLIB.bin2hstr(thisRandomSeed)
-  const thisMnemonic = QRLLIB.bin2mnemonic(thisRandomSeed)
+  const thisHashFunction = QRLLIB.getHashFunction(thisAddress)
+  const thisSignatureType = QRLLIB.getSignatureType(thisAddress)
+  const thisHeight = XMSS_OBJECT.getHeight()
+  const thisHexSeed = XMSS_OBJECT.getHexSeed()
+  const thisMnemonic = XMSS_OBJECT.getMnemonic()
 
   const xmssDetail = {
-    address: 'Q' + thisAddress,
+    address: thisAddress,
     pk: thisPk,
     hexseed: thisHexSeed,
     mnemonic: thisMnemonic,
@@ -106,6 +102,11 @@ bytesToHex = (byteArray) => {
   }).join('')
 }
 
+// Convert hex to bytes
+hexToBytes = (hex) => {
+  return Buffer.from(hex, 'hex')
+}
+
 // Returns an address ready to send to gRPC API
 addressForAPI = (address) => {
   return Buffer.from(address.substring(1), 'hex')
@@ -140,6 +141,14 @@ toBigendianUint64BytesUnsigned = (input) => {
   return result
 }
 
+toUint8Vector = (arr) => {
+  let vec = new QRLLIB.Uint8Vector()
+  for (let i = 0; i < arr.length; i++) {
+    vec.push_back(arr[i])
+  }
+  return vec
+}
+
 // Concatenates multiple typed arrays into one.
 concatenateTypedArrays = (resultConstructor, ...arrays) => {
     let totalLength = 0
@@ -155,6 +164,21 @@ concatenateTypedArrays = (resultConstructor, ...arrays) => {
     return result
 }
 
+// Check if users web browser supports Web Assemblies
+supportedBrowser = () => {
+  try {
+    if (typeof WebAssembly === "object"
+      && typeof WebAssembly.instantiate === "function") {
+      const module = new WebAssembly.Module(Uint8Array.of(0x0, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00))
+      if (module instanceof WebAssembly.Module)
+          return new WebAssembly.Instance(module) instanceof WebAssembly.Instance
+    }
+  } catch (e) {
+  }
+  return false
+}
+
+
 // Get wallet address state details
 getBalance = (getAddress, callBack) => {
   const grpcEndpoint = findNodeData(DEFAULT_NODES, selectedNode()).grpc
@@ -169,17 +193,24 @@ getBalance = (getAddress, callBack) => {
     } else {
       if (res.state.address !== '') {
         LocalStore.set('transferFromBalance', res.state.balance / SHOR_PER_QUANTA)
-        LocalStore.set('transferFromAddress', binaryToQrlAddress(res.state.address))
         LocalStore.set('transferFromTokenState', res.state.tokens)
         LocalStore.set('address', res)
       } else {
         // Wallet not found, put together an empty response
         LocalStore.set('transferFromBalance', 0)
-        LocalStore.set('transferFromAddress', binaryToQrlAddress(getAddress))
       }
 
       // Collect next OTS key
       LocalStore.set('otsKeyEstimate', res.ots.nextKey)
+
+      // Get remaining OTS Keys
+      const validationResult = qrlAddressValdidator.hexString(getAddress)
+      const { keysConsumed } = res.ots
+      const totalSignatures = validationResult.sig.number
+      const keysRemaining = totalSignatures - keysConsumed
+
+      // Set keys remaining
+      LocalStore.set('otsKeysRemaining', keysRemaining)
 
       // Callback if set
       callBack()
@@ -291,11 +322,14 @@ updateBalanceField = () => {
   }
 }
 
-refreshTransferPage = () => {
+refreshTransferPage = (callback) => {
   resetLocalStorageState()
 
   // Wait for QRLLIB to load
   waitForQRLLIB(function () {
+    // Set transfer from address
+    LocalStore.set('transferFromAddress', getXMSSDetails().address)
+
     // Get address balance
     getBalance(getXMSSDetails().address, function() {
       // Load Wallet Transactions
@@ -315,6 +349,8 @@ refreshTransferPage = () => {
         txArray = txArray.slice(0, 9)
       }
       loadAddressTransactions(txArray)
+
+      callback()
     })
 
     // Get Tokens and Balances

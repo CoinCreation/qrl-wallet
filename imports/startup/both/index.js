@@ -5,12 +5,12 @@ import './nodes.js'
 SHOR_PER_QUANTA=1000000000
 
 // qrl-wallet Version
-WALLET_VERSION="0.3.1"
+WALLET_VERSION="0.3.2"
 
 // Function to cleanly represent large decimal numbers without exponentional formatting.
 numberToString = (num) => {
   const math = require('mathjs')
-  return math.format(num,{exponential:{lower:0,upper:Infinity}})
+  return math.format(num, { notation: 'fixed', "lowerExp": 1e-100, "upperExp": Infinity });
 }
 
 // Convert decimal value to binary
